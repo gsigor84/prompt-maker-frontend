@@ -17,8 +17,7 @@ function isLikelyJsonString(s) {
   if (!s || typeof s !== "string") return false;
   const t = s.trim();
   return (
-    (t.startsWith("{") && t.endsWith("}")) ||
-    (t.startsWith("[") && t.endsWith("]"))
+    (t.startsWith("{") && t.endsWith("}")) || (t.startsWith("[") && t.endsWith("]"))
   );
 }
 
@@ -39,17 +38,12 @@ function valueToPlainText(value, indent = 0) {
 
   if (value == null) return "";
   if (typeof value === "string") return pad + value;
-  if (typeof value === "number" || typeof value === "boolean")
-    return pad + String(value);
+  if (typeof value === "number" || typeof value === "boolean") return pad + String(value);
 
   if (Array.isArray(value)) {
     return value
       .map((v) => {
-        if (
-          typeof v === "string" ||
-          typeof v === "number" ||
-          typeof v === "boolean"
-        ) {
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
           return `${pad}- ${String(v)}`;
         }
         const inner = valueToPlainText(v, indent + 1);
@@ -60,18 +54,12 @@ function valueToPlainText(value, indent = 0) {
 
   return Object.entries(value)
     .map(([k, v]) => {
-      const keyLine = `${pad}${toTitleCaseKey(k)}:`;
-      const body = valueToPlainText(v, indent + 1);
-      if (!body) return keyLine;
-
-      if (
-        typeof v === "string" ||
-        typeof v === "number" ||
-        typeof v === "boolean"
-      ) {
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") {
         return `${pad}${toTitleCaseKey(k)}: ${String(v)}`;
       }
-      return `${keyLine}\n${body}`;
+      const keyLine = `${pad}${toTitleCaseKey(k)}:`;
+      const body = valueToPlainText(v, indent + 1);
+      return body ? `${keyLine}\n${body}` : keyLine;
     })
     .join("\n");
 }
@@ -84,6 +72,7 @@ function splitPlainPrompt(text) {
 
   let match;
   const indices = [];
+
   while ((match = headingRegex.exec(t)) !== null) {
     indices.push({ name: match[1], index: match.index, end: headingRegex.lastIndex });
   }
@@ -148,21 +137,25 @@ function RenderValue({ value }) {
 
   if (typeof value === "string") {
     return (
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-900">
+      <p className="whitespace-pre-wrap break-words break-all overflow-hidden text-sm leading-relaxed text-neutral-900">
         {value}
       </p>
     );
   }
 
   if (typeof value === "number" || typeof value === "boolean") {
-    return <p className="text-sm leading-relaxed text-neutral-900">{String(value)}</p>;
+    return (
+      <p className="break-words break-all overflow-hidden text-sm leading-relaxed text-neutral-900">
+        {String(value)}
+      </p>
+    );
   }
 
   if (Array.isArray(value)) {
     return (
       <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-relaxed text-neutral-900">
         {value.map((item, idx) => (
-          <li key={idx}>
+          <li key={idx} className="break-words break-all overflow-hidden">
             <RenderValue value={item} />
           </li>
         ))}
@@ -173,8 +166,8 @@ function RenderValue({ value }) {
   return (
     <div className="mt-2 space-y-3">
       {Object.entries(value).map(([k, v]) => (
-        <div key={k} className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
-          <div className="text-xs font-semibold tracking-widest text-neutral-500">
+        <div key={k} className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 md:p-4">
+          <div className="text-xs font-semibold tracking-widest text-neutral-500 break-words break-all">
             {toTitleCaseKey(k)}
           </div>
           <div className="mt-2">
@@ -240,56 +233,43 @@ export default function Home() {
     return promptText;
   };
 
-  // ✅ FIXED COPY (robust + no silent failure)
   const copyPrompt = async () => {
     const text = buildCopyText();
     if (!text) return;
 
-    const done = () => {
+    try {
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
-    };
-
-    // Attempt #1: Clipboard API
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-        done();
-        return;
-      }
+      return;
     } catch {
-      // fall through to textarea fallback
+      // fallback
     }
 
-    // Attempt #2: textarea fallback (works on more browsers)
     try {
       const ta = document.createElement("textarea");
       ta.value = text;
       ta.setAttribute("readonly", "");
       ta.style.position = "fixed";
       ta.style.top = "0";
-      ta.style.left = "0";
-      ta.style.opacity = "0";
-      ta.style.pointerEvents = "none";
+      ta.style.left = "-9999px";
       document.body.appendChild(ta);
-
       ta.focus();
       ta.select();
-
       const ok = document.execCommand("copy");
       document.body.removeChild(ta);
 
-      if (!ok) throw new Error("execCommand returned false");
+      if (!ok) throw new Error("execCommand failed");
 
-      done();
-      return;
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
     } catch {
-      alert("Copy failed. Please select the text and copy manually.");
+      alert("Copy failed. Please select and copy manually.");
     }
   };
 
   return (
-    <main className="relative min-h-screen bg-neutral-950 px-4 py-12 md:py-16">
+    <main className="relative min-h-screen overflow-x-hidden bg-neutral-950 px-4 py-12 md:py-16">
       {/* background */}
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -left-24 -top-24 h-[520px] w-[520px] rounded-full bg-orange-500/20 blur-[120px]" />
@@ -324,7 +304,7 @@ export default function Home() {
         <section className="mt-8 md:mt-10 bg-neutral-50 p-5 md:p-10">
           <div className="mx-auto max-w-3xl">
             {/* Input bar */}
-            <div className="flex items-center rounded-full border border-neutral-300 bg-white px-2 py-2 transition hover:border-neutral-400">
+            <div className="flex items-center rounded-2xl md:rounded-full border border-neutral-300 bg-white px-2 py-2 transition hover:border-neutral-400">
               <button
                 onClick={makePrompt}
                 disabled={loading}
@@ -333,15 +313,17 @@ export default function Home() {
                 {loading ? "WORKING…" : "MAKE PROMPT"}
               </button>
 
+              {/* iOS zoom fix: text-base (16px) on mobile */}
               <textarea
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
                 placeholder="Type what you want the AI to do…"
                 className="
                   w-full bg-transparent px-4
-                  text-sm text-neutral-900 placeholder:text-neutral-400
+                  text-base md:text-sm text-neutral-900 placeholder:text-neutral-400
                   outline-none resize-none
-                  h-24 py-3 leading-snug
+
+                  h-28 py-3 leading-snug
                   md:h-10 md:py-2 md:leading-[1.25rem]
                 "
               />
@@ -374,20 +356,21 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* Raw view */}
                 {showRaw ? (
-                  <pre className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-neutral-900">
+                  <pre className="mt-3 whitespace-pre-wrap break-words break-all overflow-hidden text-sm leading-relaxed text-neutral-900">
                     {promptText}
                   </pre>
                 ) : (
                   <div className="mt-4 space-y-5">
                     {parsed.mode === "plain_text" &&
                       parsed.sections.map((s) => (
-                        <div key={s.title} className="rounded-xl border border-neutral-200 p-4">
+                        <div key={s.title} className="rounded-xl border border-neutral-200 p-4 md:p-5">
                           <div className="text-xs font-semibold tracking-widest text-neutral-500">
                             {s.title}
                           </div>
                           <div className="mt-2">
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-neutral-900">
+                            <p className="whitespace-pre-wrap break-words break-all overflow-hidden text-sm leading-relaxed text-neutral-900">
                               {s.content}
                             </p>
                           </div>
@@ -396,7 +379,7 @@ export default function Home() {
 
                     {(parsed.mode === "json_sections" || parsed.mode === "json_generic") &&
                       parsed.sections.map((s) => (
-                        <div key={s.title} className="rounded-xl border border-neutral-200 p-4">
+                        <div key={s.title} className="rounded-xl border border-neutral-200 p-4 md:p-5">
                           <div className="text-xs font-semibold tracking-widest text-neutral-500">
                             {s.title}
                           </div>
