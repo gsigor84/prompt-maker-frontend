@@ -8,24 +8,15 @@
  * @returns {Promise<Object>} The response containing final_prompt, execution_trace, and/or questions.
  */
 export async function runAgentPipeline(task, model = "gpt-4o-mini", interactiveMode = false, answers = null) {
-    // Use environment variable for API URL, fallback to production
+    // Switch fallback to production
     const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://prompt-maker-backend.fly.dev";
 
-    // DEBUG LOG
-    console.log("🚀 [AgentAPI] Request:", { task, interactiveMode, answers });
-
+    // ... (rest of the code remains the same)
     try {
         const response = await fetch(`${API_URL}/api/v2/agent/run`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                task,
-                model,
-                interactive_mode: interactiveMode,
-                answers, // New field for Interactive Mode Round 2
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task, model, interactive_mode: interactiveMode, answers }),
         });
 
         if (!response.ok) {
@@ -36,6 +27,35 @@ export async function runAgentPipeline(task, model = "gpt-4o-mini", interactiveM
         return await response.json();
     } catch (error) {
         console.error("Agent Pipeline failed:", error);
+        throw error;
+    }
+}
+
+/**
+ * Calls the Thinking Partner Analyze API.
+ */
+export async function analyzeThinking(task) {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://prompt-maker-backend.fly.dev";
+
+    try {
+        const response = await fetch(`${API_URL}/api/v2/thinking-partner/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: task }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            // Stringify the error detail if it's an object/array (FastAPI Validation errors are lists)
+            const errorMessage = typeof errorData.detail === 'object'
+                ? JSON.stringify(errorData.detail)
+                : (errorData.detail || `API Error: ${response.status}`);
+            throw new Error(errorMessage);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Thinking Partner failed:", error);
         throw error;
     }
 }
